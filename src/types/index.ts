@@ -257,3 +257,18 @@ export interface Answer {
   dislikes_count: number;
   user_reaction?: "like" | "dislike" | null;
 }
+
+export interface QuestionState {
+  questions: Question[];
+  myQuestions: {
+    questions: any[];
+    total: number;
+    page: number;
+    page_size: number;
+    total_pages: number;
+  };
+  currentQuestion: Question | null;
+  answers: Answer[];
+  loading: boolean;
+  error: string | null;
+}

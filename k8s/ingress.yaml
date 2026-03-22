@@ -1,0 +1,44 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: feedmeback-ingress
+  namespace: default
+  annotations:
+    cert-manager.io/cluster-issuer: "namespaxe"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/use-forwarded-headers: "true"
+    nginx.ingress.kubernetes.io/real-ip-header: "X-Forwarded-For"
+    nginx.ingress.kubernetes.io/remote-addr-header: "X-Forwarded-For"
+
+spec:
+  ingressClassName: nginx
+
+  tls:
+    - hosts:
+        - feedmeback.cloud
+        - www.feedmeback.cloud
+      secretName: task-tracker-tls
+
+  rules:
+    - host: feedmeback.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: feedmeback-service
+                port:
+                  number: 80
+
+    - host: www.feedmeback.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: feedmeback-service
+                port:
+                  number: 80

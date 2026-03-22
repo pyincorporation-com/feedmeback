@@ -354,7 +354,7 @@ const LandingPage: React.FC = () => {
                             whiteSpace: 'nowrap',
                         }}
                     >
-                        © 2026 feedmeback
+                        © 2026 powered by <a href='https://tridelight.com' target='_blank' >TrideLight</a>
                     </Typography>
 
                     <Stack
@@ -398,21 +398,19 @@ const LandingPage: React.FC = () => {
                     >
                         <FooterLink
                             variant="body2"
-                            onClick={() => {/* handle privacy */ }}
+                            onClick={() => {
+                                window.open('https://tridelight.com/privacy-policy', '_blank', 'noopener,noreferrer');
+                            }}
                         >
                             Privacy
                         </FooterLink>
                         <FooterLink
                             variant="body2"
-                            onClick={() => {/* handle terms */ }}
+                            onClick={() => {
+                                window.open('https://tridelight.com/terms-and-conditions', '_blank', 'noopener,noreferrer');
+                            }}
                         >
                             Terms
-                        </FooterLink>
-                        <FooterLink
-                            variant="body2"
-                            onClick={() => window.open('https://github.com', '_blank')}
-                        >
-                            GitHub
                         </FooterLink>
                     </Stack>
                 </GlassFooter>

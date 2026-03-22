@@ -20,6 +20,8 @@ import AppLayout from './components/Layout/AppLayout';
 import Box from '@mui/material/Box';
 import BackgroundWave from './components/BackgroundWave';
 import CircularProgress from '@mui/material/CircularProgress';
+import MyQuestions from './components/Questions/MyQuestions';
+import EditQuestion from './components/Questions/EditQuestion';
 
 const theme = createTheme({
   palette: {
@@ -77,7 +79,6 @@ const LoadingScreen = () => (
     background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
     position: 'relative',
   }}>
-    <BackgroundWave speed={0.2} />
     <Box sx={{
       position: 'relative',
       zIndex: 10,
@@ -110,7 +111,7 @@ const HomeRoute: React.FC = () => {
 const AppContent: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { token, user } = useAppSelector((state) => state.auth);
+  const { token, user, loading } = useAppSelector((state) => state.auth);
   const location = useLocation();
 
   useEffect(() => {
@@ -125,6 +126,11 @@ const AppContent: React.FC = () => {
       navigate('/');
     }
   }, [token, user, location, navigate]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
 
   return (
     <Routes>
@@ -148,10 +154,24 @@ const AppContent: React.FC = () => {
         </AppLayout> : <QuestionDetail />
         // </PrivateRoute>
       } />
+      <Route path="/questions/edit/:id" element={
+        <PrivateRoute>
+          <AppLayout>
+            <EditQuestion />
+          </AppLayout>
+        </PrivateRoute>
+      } />
       <Route path="/profile" element={
         <PrivateRoute>
           <AppLayout>
             <Profile />
+          </AppLayout>
+        </PrivateRoute>
+      } />
+      <Route path="/questions" element={
+        <PrivateRoute>
+          <AppLayout>
+            <MyQuestions />
           </AppLayout>
         </PrivateRoute>
       } />

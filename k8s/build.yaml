@@ -1,0 +1,93 @@
+name: Build and Push SSR Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      # Step 3: Set up system dependencies (Python, pip)
+      - name: Set up pip3
+        run: |
+          sudo apt-get update && sudo apt-get install -y python3-pip
+
+      # Step 4: Install namespaxe CLI
+      - name: Install namespaxe
+        run: |
+          pip3 install namespaxe
+
+      # Step 5: Install Node.js dependencies
+      - name: Install dependencies
+        run: |
+          for i in {1..5}; do
+            npm install --legacy-peer-deps && break || sleep 15;
+          done
+
+      # Step 6: Build the static project
+      - name: Build static project
+        run: npm run build
+
+      # Step 7: Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Step 8: Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Step 9: Define Docker image tag
+      - name: Set Docker image tag
+        id: vars
+        run: |
+          echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      # Step 10: Build and push Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/tms:tms-0.0.9
+
+      # Step 11: namespaxe login
+      - name: namespaxe login
+        env:
+          namespaxe_USERNAME: ${{ secrets.namespaxe_USERNAME }}
+          namespaxe_PASSWORD: ${{ secrets.namespaxe_PASSWORD }}
+        run: |
+          namespaxe login --username "${{ secrets.namespaxe_USERNAME }}" --password "${{ secrets.namespaxe_PASSWORD }}"
+
+      # Step 12: Install Kubernetes configuration
+      - name: Install Kubernetes configuration
+        run: |
+          namespaxe config ns staging-1755697183-jmwziu
+
+      # Step 13: Install kubectl
+      - name: Install kubectl
+        run: |
+          curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv ./kubectl /usr/local/bin/kubectl
+
+      # Step 14: Update Kubernetes Deployment
+      - name: Deploy the app to Kubernetes
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl rollout status deployment/tms-pos --timeout=220s

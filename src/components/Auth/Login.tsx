@@ -19,7 +19,7 @@ import {
 import { styled } from '@mui/material/styles';
 import { useForm } from 'react-hook-form';
 import { useNavigate, Link } from 'react-router-dom';
-import { login, clearError } from '../../store/slices/authSlice';
+import { login, clearError, fetchProfile } from '../../store/slices/authSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
@@ -165,6 +165,7 @@ const Login: React.FC = () => {
     const onSubmit = async (data: LoginForm) => {
         const result = await dispatch(login(data));
         if (login.fulfilled.match(result)) {
+            await dispatch(fetchProfile());
             navigate('/');
         }
     };
@@ -326,8 +327,8 @@ const Login: React.FC = () => {
                         }}
                     >
                         By signing in, you agree to our{' '}
-                        <StyledLink to="/terms">Terms</StyledLink> and{' '}
-                        <StyledLink to="/privacy">Privacy Policy</StyledLink>
+                        <StyledLink to="https://tridelight.com/terms-and-conditions" target='_blank'>Terms</StyledLink> and{' '}
+                        <StyledLink to="https://tridelight.com/privacy-policy" target='_blank'>Privacy Policy</StyledLink>
                     </Typography>
                 </GlassCard>
             </ContentWrapper>

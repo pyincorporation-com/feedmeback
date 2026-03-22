@@ -124,14 +124,32 @@ export const logout = createAsyncThunk<void, void, { rejectValue: string }>(
   "auth/logout",
   async (_, { rejectWithValue }) => {
     try {
-      // Call logout endpoint to invalidate refresh token on server
       await api.post("/logout", {});
     } catch (error) {
-      // Ignore errors on logout
+      // Even if logout fails, we still want to clear local state
+      console.error("Logout API failed:", error);
     }
-    // No localStorage cleanup needed
   },
 );
+
+// Add deleteAccount thunk
+export const deleteAccount = createAsyncThunk<
+  void,
+  void,
+  { rejectValue: string }
+>("auth/deleteAccount", async (_, { rejectWithValue }) => {
+  try {
+    // Call the delete account endpoint
+    const response = await api.delete("/profile");
+    return response.data;
+  } catch (error: any) {
+    const errorMessage =
+      error.response?.data?.detail ||
+      error.response?.data?.message ||
+      "Failed to delete account";
+    return rejectWithValue(errorMessage);
+  }
+});
 
 export const hydrateAuth = createAsyncThunk<
   void,
@@ -148,6 +166,29 @@ export const hydrateAuth = createAsyncThunk<
     return rejectWithValue("No active session");
   }
 });
+
+export const changePassword = createAsyncThunk<
+  void,
+  { old_password: string; new_password: string },
+  { rejectValue: string }
+>(
+  "auth/changePassword",
+  async ({ old_password, new_password }, { rejectWithValue }) => {
+    try {
+      const response = await api.post("/change-password", {
+        old_password,
+        new_password,
+      });
+      return response.data;
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        "Failed to change password";
+      return rejectWithValue(errorMessage);
+    }
+  },
+);
 
 const authSlice = createSlice({
   name: "auth",
@@ -228,6 +269,20 @@ const authSlice = createSlice({
         state.user = null;
         state.token = null;
       })
+      // Delete Account
+      .addCase(deleteAccount.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteAccount.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+      })
+      .addCase(deleteAccount.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to delete account";
+      })
       // Hydrate
       .addCase(hydrateAuth.pending, (state) => {
         state.loading = true;
@@ -239,6 +294,16 @@ const authSlice = createSlice({
         state.loading = false;
         state.token = null;
         state.user = null;
+      }) // Change Password
+      .addCase(changePassword.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(changePassword.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(changePassword.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to change password";
       });
   },
 });

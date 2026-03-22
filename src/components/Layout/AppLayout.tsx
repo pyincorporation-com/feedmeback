@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Box,
     Drawer,
@@ -21,11 +21,17 @@ import {
     Badge,
     InputBase,
     Paper,
+    useMediaQuery,
+    Dialog,
+    DialogContent,
+    Stack,
+    Chip,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks/redux';
 import { logout } from '../../store/slices/authSlice';
+import { fetchQuestions } from '../../store/slices/questionSlice';
 import MenuIcon from '@mui/icons-material/Menu';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
@@ -36,6 +42,8 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import SearchIcon from '@mui/icons-material/Search';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import CloseIcon from '@mui/icons-material/Close';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 
 // Drawer width
 const DRAWER_WIDTH = 280;
@@ -45,17 +53,20 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
     open?: boolean;
 }>(({ theme, open }) => ({
     flexGrow: 1,
-    padding: theme.spacing(3),
+    padding: theme.spacing(2),
+    width: '100%',
     transition: theme.transitions.create('margin', {
         easing: theme.transitions.easing.sharp,
         duration: theme.transitions.duration.leavingScreen,
     }),
     marginLeft: 0,
     ...(open && {
-        transition: theme.transitions.create('margin', {
-            easing: theme.transitions.easing.easeOut,
-            duration: theme.transitions.duration.enteringScreen,
-        }),
+        [theme.breakpoints.up('md')]: {
+            transition: theme.transitions.create('margin', {
+                easing: theme.transitions.easing.easeOut,
+                duration: theme.transitions.duration.enteringScreen,
+            }),
+        },
     }),
 }));
 
@@ -72,26 +83,33 @@ const StyledAppBar = styled(AppBar, { shouldForwardProp: (prop) => prop !== 'ope
         duration: theme.transitions.duration.leavingScreen,
     }),
     ...(open && {
-        width: `calc(100% - ${DRAWER_WIDTH}px)`,
-        marginLeft: `${DRAWER_WIDTH}px`,
-        transition: theme.transitions.create(['margin', 'width'], {
-            easing: theme.transitions.easing.easeOut,
-            duration: theme.transitions.duration.enteringScreen,
-        }),
+        [theme.breakpoints.up('md')]: {
+            width: `calc(100% - ${DRAWER_WIDTH}px)`,
+            marginLeft: `${DRAWER_WIDTH}px`,
+            transition: theme.transitions.create(['margin', 'width'], {
+                easing: theme.transitions.easing.easeOut,
+                duration: theme.transitions.duration.enteringScreen,
+            }),
+        },
     }),
 }));
 
 const StyledDrawer = styled(Drawer)(({ theme, open }) => ({
-    width: open ? DRAWER_WIDTH : 0,
+    width: 0,
     flexShrink: 0,
+    ...(open && {
+        width: DRAWER_WIDTH,
+    }),
     '& .MuiDrawer-paper': {
-        width: open ? DRAWER_WIDTH : 0,
+        width: 0,
         boxSizing: 'border-box',
         background: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
         borderRight: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
         boxShadow: 'none',
-        overflowX: 'hidden'
+        ...(open && {
+            width: DRAWER_WIDTH,
+        })
     },
 }));
 
@@ -122,6 +140,10 @@ const SearchBar = styled(Paper)(({ theme }) => ({
     '& .MuiInputBase-root': {
         flex: 1,
         fontSize: '0.95rem',
+    },
+    [theme.breakpoints.down('sm')]: {
+        width: '100%',
+        maxWidth: 200,
     },
 }));
 
@@ -168,7 +190,7 @@ const NotificationBadge = styled(Badge)(({ theme }) => ({
             width: '100%',
             height: '100%',
             borderRadius: '50%',
-            animation: 'ripple 1.2s infinite ease-in-out',
+            // animation: 'ripple 1.2s infinite ease-in-out',
             border: '1px solid currentColor',
             content: '""',
         },
@@ -185,13 +207,26 @@ const NotificationBadge = styled(Badge)(({ theme }) => ({
     },
 }));
 
+const SearchResultItem = styled(Box)(({ theme }) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: theme.spacing(1.5),
+    borderRadius: 12,
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    border: `1px solid ${alpha(theme.palette.divider, 0.06)}`,
+    '&:hover': {
+        background: alpha(theme.palette.primary.main, 0.02),
+        borderColor: alpha(theme.palette.primary.main, 0.2),
+        transform: 'translateY(-2px)',
+    },
+}));
+
 // Navigation items
 const navItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'My Questions', icon: <QuestionAnswerIcon />, path: '/my-questions' },
-    { text: 'Create Question', icon: <AddIcon />, path: '/questions/create' },
-    { text: 'Profile', icon: <PersonIcon />, path: '/profile' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+    { text: 'My Questions', icon: <QuestionAnswerIcon />, path: '/questions' },
 ];
 
 interface AppLayoutProps {
@@ -204,13 +239,37 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     const location = useLocation();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.auth);
+    const { questions } = useAppSelector((state) => state.questions);
+    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-    const [open, setOpen] = useState(true);
+    const [open, setOpen] = useState(!isMobile);
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [showSearchDialog, setShowSearchDialog] = useState(false);
+    const [hasSearched, setHasSearched] = useState(false);
+
+    // Update search results only when questions change and a search has been performed
+    useEffect(() => {
+        if (hasSearched && searchTerm.trim()) {
+            const filtered = questions.filter(q =>
+                q.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                q.description?.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+            setSearchResults(filtered);
+            setShowSearchDialog(filtered.length > 0);
+        }
+    }, [questions, searchTerm, hasSearched]);
 
     const handleDrawerToggle = () => {
         setOpen(!open);
+    };
+
+    const handleDrawerClose = () => {
+        if (isMobile) {
+            setOpen(false);
+        }
     };
 
     const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -229,18 +288,63 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         setNotificationAnchor(null);
     };
 
-    const handleLogout = () => {
-        dispatch(logout());
+    const handleLogout = async () => {
+        await dispatch(logout());
         handleMenuClose();
-        navigate('/');
+        navigate('/login');
     };
 
     const handleNavigation = (path: string) => {
         navigate(path);
+        if (isMobile) {
+            setOpen(false);
+        }
+    };
+
+    const handleSearch = () => {
+        if (searchTerm.trim()) {
+            setHasSearched(true);
+            dispatch(fetchQuestions({ search: searchTerm }));
+        }
+    };
+
+    const handleSearchKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSearch();
+        }
+    };
+
+    const handleClearSearch = () => {
+        setSearchTerm('');
+        setSearchResults([]);
+        setShowSearchDialog(false);
+        setHasSearched(false);
+        // Reset to show all questions
+        dispatch(fetchQuestions());
+    };
+
+    const handleSearchResultClick = (questionId: string) => {
+        navigate(`/question/${questionId}`);
+        setShowSearchDialog(false);
+        setSearchTerm('');
+        setSearchResults([]);
+        setHasSearched(false);
+    };
+
+    const getAnswerTypeIcon = (type: string) => {
+        switch (type) {
+            case 'multiple_choice': return '☑️';
+            case 'checkbox': return '✅';
+            case 'rating_scale': return '⭐';
+            case 'emoji_scale': return '😊';
+            case 'slider': return '📊';
+            case 'text_input': return '✏️';
+            default: return '❓';
+        }
     };
 
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8fafc' }}>
+        <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#f8fafc', maxWidth: '100%', width: '100%' }}>
             <StyledAppBar position="fixed" open={open} elevation={0}>
                 <Toolbar>
                     <IconButton
@@ -250,7 +354,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                         edge="start"
                         sx={{ mr: 2 }}
                     >
-                        {open ? <ChevronLeftIcon /> : <MenuIcon />}
+                        <MenuIcon />
                     </IconButton>
 
                     <SearchBar elevation={0}>
@@ -258,7 +362,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                         <InputBase
                             placeholder="Search questions..."
                             sx={{ flex: 1 }}
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyPress={handleSearchKeyPress}
                         />
+                        {searchTerm && (
+                            <IconButton size="small" onClick={handleClearSearch} sx={{ p: 0.5 }}>
+                                <CloseIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                        )}
                     </SearchBar>
 
                     <Box sx={{ flexGrow: 1 }} />
@@ -298,9 +410,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             </StyledAppBar>
 
             <StyledDrawer
-                variant="persistent"
+                variant={isMobile ? "temporary" : "persistent"}
                 anchor="left"
                 open={open}
+                onClose={handleDrawerClose}
+                ModalProps={{
+                    keepMounted: true,
+                }}
             >
                 <DrawerHeader>
                     <Logo>
@@ -315,9 +431,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                             feedmeback
                         </Typography>
                     </Logo>
-                    {/* <IconButton onClick={handleDrawerToggle}>
-                        <ChevronLeftIcon />
-                    </IconButton> */}
+                    {isMobile && (
+                        <IconButton onClick={handleDrawerClose}>
+                            <ChevronLeftIcon />
+                        </IconButton>
+                    )}
                 </DrawerHeader>
 
                 <Divider sx={{ opacity: 0.5 }} />
@@ -374,6 +492,81 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 {children}
             </Main>
 
+            {/* Search Results Dialog */}
+            <Dialog
+                open={showSearchDialog && searchResults.length > 0}
+                onClose={() => {
+                    setShowSearchDialog(false);
+                    setHasSearched(false);
+                }}
+                maxWidth="sm"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        borderRadius: 3,
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(20px)',
+                        border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                    }
+                }}
+            >
+                <DialogContent sx={{ p: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            Search Results ({searchResults.length})
+                        </Typography>
+                        <IconButton size="small" onClick={() => {
+                            setShowSearchDialog(false);
+                            setHasSearched(false);
+                        }}>
+                            <CloseIcon fontSize="small" />
+                        </IconButton>
+                    </Box>
+                    <Stack spacing={1.5}>
+                        {searchResults.map((question) => (
+                            <SearchResultItem
+                                key={question.id}
+                                onClick={() => handleSearchResultClick(question.id)}
+                            >
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                            {question.title}
+                                        </Typography>
+                                        <Chip
+                                            label={getAnswerTypeIcon(question.answer_type)}
+                                            size="small"
+                                            sx={{ height: 20, fontSize: '0.7rem' }}
+                                        />
+                                    </Box>
+                                    {question.description && (
+                                        <Typography variant="caption" color="text.secondary" sx={{
+                                            display: 'block',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap',
+                                        }}>
+                                            {question.description}
+                                        </Typography>
+                                    )}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {new Date(question.created_at).toLocaleDateString()}
+                                        </Typography>
+                                        <Chip
+                                            label={`${question.answers_count || 0} answers`}
+                                            size="small"
+                                            sx={{ height: 18, fontSize: '0.6rem' }}
+                                        />
+                                    </Box>
+                                </Box>
+                                <KeyboardArrowRightIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
+                            </SearchResultItem>
+                        ))}
+                    </Stack>
+                </DialogContent>
+            </Dialog>
+
             {/* Profile Menu */}
             <Menu
                 anchorEl={anchorEl}
@@ -403,9 +596,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             >
                 <MenuItem onClick={() => { handleMenuClose(); navigate('/profile'); }}>
                     <PersonIcon fontSize="small" /> Profile
-                </MenuItem>
-                <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
-                    <SettingsIcon fontSize="small" /> Settings
                 </MenuItem>
                 <Divider sx={{ my: 1, opacity: 0.5 }} />
                 <MenuItem onClick={handleLogout}>

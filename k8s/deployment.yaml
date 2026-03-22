@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: feedmeback
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: feedmeback
+  template:
+    metadata:
+      labels:
+        app: feedmeback
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: feedmeback-container
+          image: pyinc/pyinc:feedmeback-frontend-0.0.0
+          resources:
+            requests:
+              memory: "300Mi"
+              cpu: "200m"
+            limits:
+              memory: "1024Mi"
+              cpu: "250m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      imagePullSecrets:
+        - name: docker-secret

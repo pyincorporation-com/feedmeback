@@ -235,7 +235,7 @@ const CreateQuestion: React.FC = () => {
     };
 
     return (
-        <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Container maxWidth="xl" sx={{ py: 5 }}>
             <FormCard elevation={0}>
                 {/* Header */}
                 <Box sx={{ mb: 3 }}>
